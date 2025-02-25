@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESP32-CAM Giám Sát</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            display: flex;
+            height: 100vh;
+        }
+        .video-container, .motion-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .video-container {
+            background-color: #f0f0f0;
+        }
+        .motion-container {
+            background-color: #fff5f5;
+            border-left: 2px solid #ff4444;
+        }
+        h1, h2 {
+            margin-bottom: 15px;
+        }
+        #motion_alert {
+            color: red;
+            font-size: 20px;
+            font-weight: bold;
+            display: none;
+        }
+        #motion_image {
+            border-radius: 10px;
+            box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.2);
+            display: none;
+        }
+        #close_alert {
+            margin-top: 10px;
+            padding: 8px 12px;
+            font-size: 16px;
+            background-color: #ff4444;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            display: none;
+        }
+        #close_alert:hover {
+            background-color: #cc0000;
+        }
+    </style>
+    <script>
+        let lastMotionImage = ""; // Lưu ảnh chuyển động cuối cùng
+        let hideManually = false; // Kiểm soát trạng thái ẩn của người dùng
+
+        function checkMotion() {
+            fetch("/latest_motion")
+                .then(response => response.json())
+                .then(data => {
+                    if (data.image && data.image !== "none") {
+                        // Nếu có ảnh mới và khác ảnh cũ, hoặc người dùng đã ẩn trước đó nhưng có chuyển động mới
+                        if (data.image !== lastMotionImage || hideManually) {
+                            lastMotionImage = data.image;
+                            hideManually = false; // Reset trạng thái ẩn khi có chuyển động mới
+
+                            document.getElementById("motion_image").src = data.image;
+                            document.getElementById("motion_alert").innerText = data.message;
+                            document.getElementById("motion_alert").style.display = "block";
+                            document.getElementById("motion_image").style.display = "block";
+                            document.getElementById("close_alert").style.display = "block";
+
+                            // Ẩn sau 5 giây nếu không có hành động từ người dùng
+                            setTimeout(() => {
+                                if (!hideManually) {
+                                    document.getElementById("motion_alert").style.display = "none";
+                                    document.getElementById("motion_image").style.display = "none";
+                                    document.getElementById("close_alert").style.display = "none";
+                                }
+                            }, 150000);
+                        }
+                    }
+                })
+                .catch(error => console.error("Lỗi lấy dữ liệu:", error));
+        }
+
+        function closeAlert() {
+            hideManually = true;  // Đánh dấu rằng người dùng đã ẩn thủ công
+            document.getElementById("motion_alert").style.display = "none";
+            document.getElementById("motion_image").style.display = "none";
+            document.getElementById("close_alert").style.display = "none";
+        }
+
+        setInterval(checkMotion, 3000);  // Kiểm tra mỗi 3 giây
+    </script>
+</head>
+<body>
+    <div class="container">
+        <!-- Cột bên trái: Video trực tiếp -->
+        <div class="video-container">
+            <h1>📷 ESP32-CAM Video Giám Sát</h1>
+            <img src="{{ url_for('video_feed') }}" width="640" height="480">
+        </div>
+
+        <!-- Cột bên phải: Cảnh báo và ảnh chụp chuyển động -->
+        <div class="motion-container">
+            <h2>🔔 Cảnh Báo Chuyển Động</h2>
+            <p id="motion_alert">Không có chuyển động.</p>
+            <img id="motion_image" src="" width="320" height="240" alt="Chưa có chuyển động">
+            <button id="close_alert" onclick="closeAlert()">Tắt thông báo</button>
+        </div>
+    </div>
+</body>
+</html>
